@@ -1,14 +1,30 @@
+import User from "@/models/userModel";
 import nodemailer from "nodemailer";
+import bcryptjs from "bcryptjs";
 
 export const sendEmail = async (email, emailType, userId) => {
   try {
+    //Configure mail for users
+    const hashedToken = await bcryptjs.hash(userId.toString(), 10);
+
+    if (emailType === "VERIFY") {
+      await User.findByIdAndUpdate(userId, {
+        verifyToken: hashedToken,
+        verifyTokenExpiry: Date.now() + 60 * 60 * 1000, // 1 hour
+      });
+    } else if (emailType === "RESET") {
+      await User.findByIdAndUpdate(userId, {
+        forgotPasswordToken: hashedToken,
+        forgotPasswordTokenExpiry: Date.now() + 60 * 60 * 1000, // 1 hour
+      });
+    }
+
     const transporter = nodemailer.createTransport({
-      host: "smtp.ethereal.email",
-      port: 465,
-      secure: true, // true for port 465, false for other ports
+      host: "sandbox.smtp.mailtrap.io",
+      port: 2525,
       auth: {
-        user: "maddison53@ethereal.email",
-        pass: "jn7jnAPss4f63QBp6D",
+        user: "db212b07ab1b26",
+        pass: "****9237",
       },
     });
 
@@ -16,8 +32,15 @@ export const sendEmail = async (email, emailType, userId) => {
       from: '"Maddison Foo Koch 👻" <maddison53@ethereal.email>', // sender address
       to: email, // list of receivers
       subject:
-        emailType === "Verify" ? "Verification Link" : "Password reset Link", // Subject line
-      html: "<b>Hello world?</b>", // html body
+        emailType === "VERIFY" ? "Verification Link" : "Password reset Link", // Subject line
+      html: `<p>Click <a href="${
+        process.env.DOMAIN
+      }/verifyemail?token=${hashedToken}">here</a> to 
+        ${emailType === "VERIFY" ? "verify your email" : "reset your password"}
+        or copy and paste the tink below in your browser.
+        <br />
+        ${process.env.DOMAIN}/verifyemail?token=${hashedToken}
+        </p>`,
     };
     const info = await transporter.sendMail(mailOptions);
 
